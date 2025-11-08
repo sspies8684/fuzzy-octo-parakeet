@@ -1,6 +1,5 @@
 package com.example.oncall
 
-import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -24,6 +23,23 @@ enum class AlertStatus {
     ACKNOWLEDGED,
     EXHAUSTED
 }
+
+/**
+ * Result of attempting to acknowledge an alert.
+ */
+enum class AcknowledgementStatus {
+    ACKNOWLEDGED,
+    ALREADY_ACKNOWLEDGED,
+    ALERT_NOT_FOUND,
+    ASSIGNMENT_NOT_FOUND,
+    TOKEN_NOT_FOUND
+}
+
+data class AcknowledgementOutcome(
+    val status: AcknowledgementStatus,
+    val responder: Responder? = null,
+    val acknowledgedAt: Instant? = null
+)
 
 /**
  * Notification channel used to reach an on-call target. Extend as needed for integrations.
@@ -90,6 +106,7 @@ data class Assignment(
     val levelIndex: Int,
     val dispatchedAt: Instant,
     val deadline: Instant,
+    val acknowledgementToken: UUID = UUID.randomUUID(),
     var acknowledgedAt: Instant? = null
 ) {
     val isAcknowledged: Boolean
@@ -195,20 +212,30 @@ class OnCallManager(
         alertId: UUID,
         responderId: UUID,
         at: Instant = Instant.now()
-    ) {
-        val alert = alertsById[alertId] ?: error("Alert $alertId not found")
-        if (alert.status != AlertStatus.PENDING) {
-            error("Alert $alertId is not pending; current status ${alert.status}")
-        }
+    ): AcknowledgementOutcome {
+        val alert = alertsById[alertId]
+            ?: return AcknowledgementOutcome(AcknowledgementStatus.ALERT_NOT_FOUND)
 
         val assignment = alert.assignments
-            .firstOrNull { it.target.responder.id == responderId && !it.isAcknowledged }
-            ?: error("Responder $responderId has no pending assignment for alert $alertId")
+            .firstOrNull { it.target.responder.id == responderId }
+            ?: return AcknowledgementOutcome(AcknowledgementStatus.ASSIGNMENT_NOT_FOUND)
 
-        assignment.acknowledge(at)
-        alert.status = AlertStatus.ACKNOWLEDGED
-        alert.acknowledgedBy = assignment.target.responder
-        alert.acknowledgedAt = at
+        return completeAcknowledgement(alert, assignment, at)
+    }
+
+    fun acknowledgeByToken(
+        alertId: UUID,
+        token: UUID,
+        at: Instant = Instant.now()
+    ): AcknowledgementOutcome {
+        val alert = alertsById[alertId]
+            ?: return AcknowledgementOutcome(AcknowledgementStatus.ALERT_NOT_FOUND)
+
+        val assignment = alert.assignments
+            .firstOrNull { it.acknowledgementToken == token }
+            ?: return AcknowledgementOutcome(AcknowledgementStatus.TOKEN_NOT_FOUND)
+
+        return completeAcknowledgement(alert, assignment, at)
     }
 
     /**
@@ -260,6 +287,39 @@ class OnCallManager(
             alert.assignments += assignment
             notificationSink.notify(alert, assignment)
         }
+    }
+
+    private fun completeAcknowledgement(
+        alert: Alert,
+        assignment: Assignment,
+        at: Instant
+    ): AcknowledgementOutcome {
+        if (alert.status == AlertStatus.ACKNOWLEDGED) {
+            return AcknowledgementOutcome(
+                status = AcknowledgementStatus.ALREADY_ACKNOWLEDGED,
+                responder = alert.acknowledgedBy,
+                acknowledgedAt = alert.acknowledgedAt
+            )
+        }
+
+        if (assignment.isAcknowledged) {
+            return AcknowledgementOutcome(
+                status = AcknowledgementStatus.ALREADY_ACKNOWLEDGED,
+                responder = assignment.target.responder,
+                acknowledgedAt = assignment.acknowledgedAt
+            )
+        }
+
+        assignment.acknowledge(at)
+        alert.status = AlertStatus.ACKNOWLEDGED
+        alert.acknowledgedBy = assignment.target.responder
+        alert.acknowledgedAt = at
+
+        return AcknowledgementOutcome(
+            status = AcknowledgementStatus.ACKNOWLEDGED,
+            responder = assignment.target.responder,
+            acknowledgedAt = at
+        )
     }
 }
 
@@ -314,14 +374,22 @@ fun main() {
     val twilioAccountSid = System.getenv("TWILIO_ACCOUNT_SID")
     val twilioAuthToken = System.getenv("TWILIO_AUTH_TOKEN")
     val twilioFromNumber = System.getenv("TWILIO_FROM_NUMBER")
+    val twilioWebhookBase = System.getenv("TWILIO_ACK_WEBHOOK_BASE")
 
     if (twilioAccountSid != null && twilioAuthToken != null && twilioFromNumber != null) {
+        val webhookBase = twilioWebhookBase ?: "https://example.com/oncall/twilio"
         sinks += TwilioNotificationSink(
             accountSid = twilioAccountSid,
             authToken = twilioAuthToken,
             fromNumber = twilioFromNumber
-        ) { alert, _ ->
-            URI.create("https://example.com/twiml/alerts/${alert.id}")
+        ) { alert, assignment ->
+            TwilioCallInstruction.Script(
+                TwilioScripts.acknowledgementPrompt(
+                    alert = alert,
+                    assignment = assignment,
+                    webhookBaseUrl = webhookBase
+                )
+            )
         }
     }
 
@@ -353,7 +421,14 @@ fun main() {
     managerEngine.advance(now.plus(Duration.ofMinutes(12)))
 
     // Secondary responder acknowledges the alert.
-    managerEngine.acknowledge(alert.id, secondary.id, now.plus(Duration.ofMinutes(13)))
+    val acknowledgementOutcome = managerEngine.acknowledge(
+        alert.id,
+        secondary.id,
+        now.plus(Duration.ofMinutes(13))
+    )
 
-    println("Alert status: ${alert.status}, acknowledged by: ${alert.acknowledgedBy?.name}")
+    println(
+        "Alert status: ${alert.status}, acknowledged by: ${alert.acknowledgedBy?.name}, " +
+            "outcome: ${acknowledgementOutcome.status}"
+    )
 }

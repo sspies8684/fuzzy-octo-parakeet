@@ -10,12 +10,13 @@ import java.net.URI
  * Notification sink that places outbound voice calls through Twilio for `PHONE_CALL` targets.
  *
  * Twilio requires you to host a TwiML document (or provide a dynamic webhook) that controls
- * how the call behaves. Provide a `twimlUrlProvider` to build the per-alert URL.
+ * how the call behaves. Provide an `instructionProvider` to return either a hosted URL or an
+ * inline TwiML script (for example, one produced by `TwilioScripts`).
  *
  * @param accountSid Twilio Account SID.
  * @param authToken Twilio Auth Token.
  * @param fromNumber Verified Twilio phone number in E.164 format (`+15551234567`).
- * @param twimlUrlProvider Returns the TwiML URL to execute for the given alert assignment.
+ * @param instructionProvider Returns the Twilio call instruction for the given alert assignment.
  */
 class TwilioNotificationSink(
     accountSid: String,
