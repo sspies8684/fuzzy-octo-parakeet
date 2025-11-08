@@ -7,8 +7,21 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div class="background" aria-hidden="true">
+      <div class="background__gradient" data-gradient></div>
+      <div class="background__noise"></div>
+      <div class="background__orb background__orb--1" data-orb></div>
+      <div class="background__orb background__orb--2" data-orb></div>
+      <div class="background__orb background__orb--3" data-orb></div>
+      <div class="background__ring background__ring--outer"></div>
+      <div class="background__ring background__ring--inner"></div>
+      <div class="background__beam background__beam--horizontal"></div>
+      <div class="background__beam background__beam--vertical"></div>
+    </div>
+
     <main class="app">
       <header class="app__header">
+        <span class="app__eyebrow">Personal productivity hub</span>
         <h1 class="app__title">FocusFlow</h1>
         <p class="app__subtitle">
           Capture quick todos, mark your wins, and stay focused.
@@ -38,11 +51,13 @@
 
         <div class="filters" role="group" aria-label="Filter tasks">
           <button class="filters__button is-active" data-filter="all">
-            All
+            <span>All</span>
           </button>
-          <button class="filters__button" data-filter="active">Active</button>
+          <button class="filters__button" data-filter="active">
+            <span>Active</span>
+          </button>
           <button class="filters__button" data-filter="completed">
-            Completed
+            <span>Completed</span>
           </button>
         </div>
 
