@@ -14,3 +14,10 @@ FocusFlow is a minimalist browser-based task planner designed to help you captur
 ## Customization Ideas
 - Tweak the colors or layout in `styles.css` to match your brand.
 - Extend `script.js` with due dates, reminders, or data export if you need more advanced planning tools.
+
+## GitHub Pages Deployment
+1. Ensure your default branch is named `main` (or adjust the branch value in `.github/workflows/deploy.yml`).
+2. Push the project and workflow file to GitHub.
+3. In your repository settings, open the **Pages** tab and set **Build and deployment** → **Source** to **GitHub Actions**.
+4. Merge or push to `main`; the `Deploy to GitHub Pages` workflow uploads the static site (`index.html`, `styles.css`, `script.js`) and publishes it automatically.
+5. The workflow output lists the live URL. You can also find it in **Settings → Pages** once the deployment completes.
