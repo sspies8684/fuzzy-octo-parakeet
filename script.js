@@ -5,9 +5,25 @@ const taskInput = document.querySelector("[data-task-input]");
 const taskList = document.querySelector("[data-task-list]");
 const filterButtons = Array.from(document.querySelectorAll("[data-filter]"));
 const emptyState = document.querySelector("[data-empty-state]");
+const surpriseButton = document.querySelector("[data-surprise-button]");
+const surprisePanel = document.querySelector("[data-surprise-panel]");
+const surpriseMessage = document.querySelector("[data-surprise-message]");
+const surpriseClose = document.querySelector("[data-surprise-close]");
 
 let tasks = [];
 let currentFilter = "all";
+let partyModeIntervalId = null;
+const confettiTimeouts = new Set();
+
+const surpriseMessages = [
+  "Focus Goblin says: Schedule your chaos like it’s an important meeting.",
+  "Achievement unlocked: Procrastination justified by 'creative ideation break.'",
+  "Reminder: Hydrate! (Focus Goblin counts coffee, tea, and dramatic sighs.)",
+  "Plot twist: That task was already done in a parallel universe. Party anyway!",
+  "Focus Goblin suggests: Rename every task to 'dance break' and see what happens.",
+];
+
+const confettiEmojis = ["🦄", "🧠", "🪩", "🍕", "🤖", "🦸‍♀️", "🥳", "🛸"];
 
 const uuid = () =>
   (typeof crypto !== "undefined" && crypto.randomUUID
@@ -141,6 +157,66 @@ const renderTasks = () => {
   }
 };
 
+const randomFrom = (items) => items[Math.floor(Math.random() * items.length)];
+
+const launchConfetti = (count = 14) => {
+  for (let index = 0; index < count; index += 1) {
+    const confetti = document.createElement("span");
+    confetti.className = "confetti";
+    confetti.textContent = randomFrom(confettiEmojis);
+    confetti.style.left = `${Math.random() * 100}vw`;
+    confetti.style.setProperty("--duration", `${3 + Math.random() * 2}s`);
+    document.body.append(confetti);
+    const timeoutId = setTimeout(() => {
+      confetti.remove();
+      confettiTimeouts.delete(timeoutId);
+    }, 5000);
+    confettiTimeouts.add(timeoutId);
+  }
+};
+
+const enterPartyMode = () => {
+  if (document.body.classList.contains("party-mode") || !surpriseButton) return;
+  document.body.classList.add("party-mode");
+  surpriseButton.textContent = "Undo the chaos";
+  surpriseButton.setAttribute("aria-expanded", "true");
+  if (surprisePanel) {
+    surprisePanel.hidden = false;
+  }
+  if (surpriseMessage) {
+    surpriseMessage.textContent = randomFrom(surpriseMessages);
+  }
+  launchConfetti();
+  partyModeIntervalId = setInterval(() => launchConfetti(10), 4000);
+};
+
+const exitPartyMode = () => {
+  if (!document.body.classList.contains("party-mode") || !surpriseButton) return;
+  document.body.classList.remove("party-mode");
+  surpriseButton.textContent = "Do Not Press";
+  surpriseButton.setAttribute("aria-expanded", "false");
+  if (surprisePanel) {
+    surprisePanel.hidden = true;
+  }
+  if (partyModeIntervalId) {
+    clearInterval(partyModeIntervalId);
+    partyModeIntervalId = null;
+  }
+  confettiTimeouts.forEach((timeoutId) => {
+    clearTimeout(timeoutId);
+  });
+  confettiTimeouts.clear();
+  document.querySelectorAll(".confetti").forEach((node) => node.remove());
+};
+
+const togglePartyMode = () => {
+  if (document.body.classList.contains("party-mode")) {
+    exitPartyMode();
+  } else {
+    enterPartyMode();
+  }
+};
+
 taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const title = taskInput.value.trim();
@@ -161,4 +237,12 @@ window.addEventListener("DOMContentLoaded", () => {
   loadTasks();
   renderTasks();
   taskInput.focus();
+});
+
+surpriseButton?.addEventListener("click", togglePartyMode);
+surpriseClose?.addEventListener("click", exitPartyMode);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    exitPartyMode();
+  }
 });
