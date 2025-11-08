@@ -5,6 +5,10 @@ const taskInput = document.querySelector("[data-task-input]");
 const taskList = document.querySelector("[data-task-list]");
 const filterButtons = Array.from(document.querySelectorAll("[data-filter]"));
 const emptyState = document.querySelector("[data-empty-state]");
+const tiltElements = Array.from(document.querySelectorAll("[data-tilt]"));
+const prefersReducedMotion =
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let tasks = [];
 let currentFilter = "all";
@@ -67,9 +71,37 @@ const toggleTask = (taskId) => {
 };
 
 const deleteTask = (taskId) => {
-  tasks = tasks.filter((task) => task.id !== taskId);
-  saveTasks();
-  renderTasks();
+  const finalizeDelete = () => {
+    tasks = tasks.filter((task) => task.id !== taskId);
+    saveTasks();
+    renderTasks();
+  };
+
+  const item = taskList.querySelector(`[data-id="${taskId}"]`);
+
+  if (!item || prefersReducedMotion || typeof item.animate !== "function") {
+    finalizeDelete();
+    return;
+  }
+
+  if (item.dataset.deleting === "true") return;
+  item.dataset.deleting = "true";
+
+  const animation = item.animate(
+    [
+      { opacity: 1, transform: "translateY(0) scale(1)" },
+      { opacity: 0, transform: "translateY(12px) scale(0.96)" },
+    ],
+    {
+      duration: 260,
+      easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+      fill: "forwards",
+    }
+  );
+
+  const finish = () => finalizeDelete();
+  animation.addEventListener("finish", finish, { once: true });
+  animation.addEventListener("cancel", finish, { once: true });
 };
 
 const getFilteredTasks = () => {
@@ -83,7 +115,27 @@ const getFilteredTasks = () => {
   }
 };
 
-const createTaskElement = (task) => {
+const animateTaskEntry = (element, index = 0) => {
+  if (prefersReducedMotion || typeof element.animate !== "function") return;
+  requestAnimationFrame(() => {
+    if (!element.isConnected) return;
+    const delay = Math.min(index * 40, 280);
+    element.animate(
+      [
+        { opacity: 0, transform: "translateY(16px) scale(0.98)" },
+        { opacity: 1, transform: "translateY(0) scale(1)" },
+      ],
+      {
+        duration: 420,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        delay,
+        fill: "both",
+      }
+    );
+  });
+};
+
+const createTaskElement = (task, index = 0) => {
   const item = document.createElement("li");
   item.className = "task";
   if (task.completed) {
@@ -123,12 +175,15 @@ const createTaskElement = (task) => {
   actions.append(deleteButton);
 
   item.append(checkbox, label, actions);
+  animateTaskEntry(item, index);
   return item;
 };
 
 const renderTasks = () => {
   const filtered = getFilteredTasks();
-  taskList.replaceChildren(...filtered.map(createTaskElement));
+  taskList.replaceChildren(
+    ...filtered.map((task, index) => createTaskElement(task, index))
+  );
 
   const hasTasks = filtered.length > 0;
   emptyState.hidden = hasTasks;
@@ -155,6 +210,41 @@ filterButtons.forEach((button) => {
   button.addEventListener("click", () => {
     setFilter(button.dataset.filter);
   });
+});
+
+tiltElements.forEach((element) => {
+  const maxTilt = 6;
+  let rafId = 0;
+
+  const resetTilt = () => {
+    element.style.setProperty("--tilt-x", "0deg");
+    element.style.setProperty("--tilt-y", "0deg");
+  };
+
+  const onPointerMove = (event) => {
+    if (prefersReducedMotion) return;
+    if (rafId) cancelAnimationFrame(rafId);
+
+    rafId = requestAnimationFrame(() => {
+      const rect = element.getBoundingClientRect();
+      const offsetX = event.clientX - rect.left;
+      const offsetY = event.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const rotateX = ((offsetY - centerY) / centerY) * -maxTilt;
+      const rotateY = ((offsetX - centerX) / centerX) * maxTilt;
+      element.style.setProperty("--tilt-x", `${rotateX.toFixed(2)}deg`);
+      element.style.setProperty("--tilt-y", `${rotateY.toFixed(2)}deg`);
+    });
+  };
+
+  element.addEventListener("pointermove", onPointerMove);
+  element.addEventListener("pointerleave", () => {
+    if (rafId) cancelAnimationFrame(rafId);
+    resetTilt();
+  });
+  element.addEventListener("touchend", resetTilt);
+  element.addEventListener("pointercancel", resetTilt);
 });
 
 window.addEventListener("DOMContentLoaded", () => {
