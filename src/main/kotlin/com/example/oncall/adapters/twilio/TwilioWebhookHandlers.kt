@@ -1,23 +1,19 @@
-package com.example.oncall
+package com.example.oncall.adapters.twilio
 
+import com.example.oncall.application.port.`in`.OnCallUseCase
+import com.example.oncall.domain.model.AcknowledgementStatus
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Helpers for building Twilio webhook responses for the acknowledgement gather flow.
- *
- * These functions can be wired to a lightweight HTTP server (Ktor, Spring, etc.) that handles the
- * Twilio `Gather` callbacks.
- */
 object TwilioWebhookHandlers {
 
     fun prompt(
-        manager: OnCallManager,
+        onCallUseCase: OnCallUseCase,
         alertId: UUID,
         token: UUID,
         webhookBaseUrl: String
     ): String {
-        val alert = manager.getAlert(alertId)
+        val alert = onCallUseCase.getAlert(alertId)
             ?: return TwilioScripts.acknowledgementAlertMissing()
 
         val assignment = alert.assignments.firstOrNull { it.acknowledgementToken == token }
@@ -27,14 +23,14 @@ object TwilioWebhookHandlers {
     }
 
     fun acknowledge(
-        manager: OnCallManager,
+        onCallUseCase: OnCallUseCase,
         alertId: UUID,
         token: UUID,
         digits: String?,
         webhookBaseUrl: String,
         at: Instant = Instant.now()
     ): String {
-        val alert = manager.getAlert(alertId)
+        val alert = onCallUseCase.getAlert(alertId)
             ?: return TwilioScripts.acknowledgementAlertMissing()
 
         val assignment = alert.assignments.firstOrNull { it.acknowledgementToken == token }
@@ -47,7 +43,7 @@ object TwilioWebhookHandlers {
 
         return when (normalizedDigits) {
             "1" -> {
-                val outcome = manager.acknowledgeByToken(alertId, token, at)
+                val outcome = onCallUseCase.acknowledgeByToken(alertId, token, at)
                 when (outcome.status) {
                     AcknowledgementStatus.ACKNOWLEDGED ->
                         TwilioScripts.acknowledgementAccepted(outcome.responder?.name)

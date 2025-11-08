@@ -1,5 +1,7 @@
-package com.example.oncall
+package com.example.oncall.adapters.twilio
 
+import com.example.oncall.domain.model.Alert
+import com.example.oncall.domain.model.Assignment
 import com.twilio.twiml.HttpMethod
 import com.twilio.twiml.VoiceResponse
 import com.twilio.twiml.voice.Gather
@@ -9,10 +11,6 @@ import com.twilio.twiml.voice.Say
 import java.util.Locale
 import java.util.UUID
 
-/**
- * Helpers that produce TwiML voice scripts for the on-call acknowledgement workflow using the
- * Twilio SDK's builder pattern.
- */
 object TwilioScripts {
     private val DEFAULT_VOICE: Say.Voice = Say.Voice.POLLY_JOANNA
 
