@@ -62,5 +62,35 @@
     </main>
 
     <script src="./script.js" defer></script>
+    <button
+      class="surprise-button"
+      type="button"
+      data-surprise-button
+      aria-expanded="false"
+      aria-controls="surprise-panel"
+    >
+      Do Not Press
+    </button>
+
+    <aside
+      class="surprise-panel"
+      id="surprise-panel"
+      data-surprise-panel
+      hidden
+      role="status"
+      aria-live="polite"
+    >
+      <h2 class="surprise-panel__title">Party Mode Engaged 🎉</h2>
+      <p class="surprise-panel__message" data-surprise-message>
+        Focus Goblin approves of this detour.
+      </p>
+      <button
+        type="button"
+        class="surprise-panel__close"
+        data-surprise-close
+      >
+        Okay, back to work
+      </button>
+    </aside>
   </body>
 </html>
