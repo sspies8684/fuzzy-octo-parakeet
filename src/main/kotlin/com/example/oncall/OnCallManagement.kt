@@ -1,5 +1,6 @@
 package com.example.oncall
 
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -31,7 +32,8 @@ enum class NotificationChannel {
     EMAIL,
     SMS,
     PUSH,
-    CHAT
+    CHAT,
+    PHONE_CALL
 }
 
 /**
@@ -48,8 +50,13 @@ data class Responder(
  */
 data class OnCallTarget(
     val responder: Responder,
-    val channel: NotificationChannel
-)
+    val channel: NotificationChannel,
+    val address: String = responder.contact
+) {
+    init {
+        require(address.isNotBlank()) { "On-call target requires a delivery address" }
+    }
+}
 
 /**
  * Escalation level describing who to notify and how long to wait for acknowledgement.
@@ -129,6 +136,24 @@ class PrintNotificationSink : NotificationSink {
                 "to ${assignment.target.responder.name} via ${assignment.target.channel} " +
                 "(deadline ${assignment.deadline})"
         )
+    }
+}
+
+/**
+ * Utility sink that fans out notifications to multiple downstream sinks. Useful for combining
+ * observability sinks (logs/metrics) with delivery mechanisms like Twilio.
+ */
+class CompositeNotificationSink(
+    private val delegates: List<NotificationSink>
+) : NotificationSink {
+    constructor(vararg sinks: NotificationSink) : this(sinks.toList())
+
+    init {
+        require(delegates.isNotEmpty()) { "CompositeNotificationSink requires at least one delegate" }
+    }
+
+    override fun notify(alert: Alert, assignment: Assignment) {
+        delegates.forEach { it.notify(alert, assignment) }
     }
 }
 
@@ -242,14 +267,20 @@ class OnCallManager(
  * Example usage that simulates a simple on-call policy, alert creation and escalations.
  */
 fun main() {
-    val primary = Responder(name = "Primary Pager", contact = "primary@example.com")
-    val secondary = Responder(name = "Secondary Pager", contact = "secondary@example.com")
-    val manager = Responder(name = "Escalation Manager", contact = "manager@example.com")
+    val primary = Responder(name = "Primary Pager", contact = "+12025550100")
+    val secondary = Responder(name = "Secondary Pager", contact = "+12025550101")
+    val manager = Responder(name = "Escalation Manager", contact = "+12025550102")
 
     val lowPolicy = EscalationPolicy(
         levels = listOf(
             EscalationLevel(
-                targets = listOf(OnCallTarget(primary, NotificationChannel.EMAIL)),
+                targets = listOf(
+                    OnCallTarget(
+                        responder = primary,
+                        channel = NotificationChannel.EMAIL,
+                        address = "primary@example.com"
+                    )
+                ),
                 acknowledgementTimeout = Duration.ofMinutes(30)
             )
         )
@@ -258,19 +289,47 @@ fun main() {
     val highPolicy = EscalationPolicy(
         levels = listOf(
             EscalationLevel(
-                targets = listOf(OnCallTarget(primary, NotificationChannel.SMS)),
+                targets = listOf(
+                    OnCallTarget(primary, NotificationChannel.SMS)
+                ),
                 acknowledgementTimeout = Duration.ofMinutes(5)
             ),
             EscalationLevel(
-                targets = listOf(OnCallTarget(secondary, NotificationChannel.SMS)),
+                targets = listOf(
+                    OnCallTarget(secondary, NotificationChannel.SMS)
+                ),
                 acknowledgementTimeout = Duration.ofMinutes(5)
             ),
             EscalationLevel(
-                targets = listOf(OnCallTarget(manager, NotificationChannel.CHAT)),
+                targets = listOf(
+                    OnCallTarget(manager, NotificationChannel.PHONE_CALL)
+                ),
                 acknowledgementTimeout = Duration.ofMinutes(5)
             )
         )
     )
+
+    val sinks = mutableListOf<NotificationSink>(PrintNotificationSink())
+
+    val twilioAccountSid = System.getenv("TWILIO_ACCOUNT_SID")
+    val twilioAuthToken = System.getenv("TWILIO_AUTH_TOKEN")
+    val twilioFromNumber = System.getenv("TWILIO_FROM_NUMBER")
+
+    if (twilioAccountSid != null && twilioAuthToken != null && twilioFromNumber != null) {
+        sinks += TwilioNotificationSink(
+            accountSid = twilioAccountSid,
+            authToken = twilioAuthToken,
+            fromNumber = twilioFromNumber
+        ) { alert, _ ->
+            URI.create("https://example.com/twiml/alerts/${alert.id}")
+        }
+    }
+
+    val notificationSink: NotificationSink = if (sinks.size == 1) {
+        sinks.single()
+    } else {
+        CompositeNotificationSink(sinks)
+    }
 
     val managerEngine = OnCallManager(
         policiesByPriority = mapOf(
@@ -278,7 +337,8 @@ fun main() {
             AlertPriority.MEDIUM to lowPolicy,
             AlertPriority.HIGH to highPolicy,
             AlertPriority.CRITICAL to highPolicy
-        )
+        ),
+        notificationSink = notificationSink
     )
 
     val now = Instant.now()
