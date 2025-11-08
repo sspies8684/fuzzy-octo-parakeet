@@ -7,15 +7,25 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div class="app-bg" aria-hidden="true">
+      <div class="app-bg__gradient"></div>
+      <div class="app-bg__orb app-bg__orb--one"></div>
+      <div class="app-bg__orb app-bg__orb--two"></div>
+      <div class="app-bg__orb app-bg__orb--three"></div>
+    </div>
+
     <main class="app">
-      <header class="app__header">
-        <h1 class="app__title">FocusFlow</h1>
+      <header class="app__header" data-tilt>
+        <span class="app__badge">Flow State</span>
+        <h1 class="app__title">
+          Focus<span class="app__title-highlight">Flow</span>
+        </h1>
         <p class="app__subtitle">
           Capture quick todos, mark your wins, and stay focused.
         </p>
       </header>
 
-      <section class="card">
+      <section class="card" data-tilt>
         <form class="task-form" data-task-form>
           <label class="task-form__label" for="task">
             Add a task
