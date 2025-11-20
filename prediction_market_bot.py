@@ -516,22 +516,38 @@ class SignalRestConnector:
         self.phone_number = phone_number
 
     def receive(self, timeout: int = 30) -> List[Dict]:
+        """Long-poll the REST API for new Signal envelopes."""
         url = f"{self.service_url}/v1/receive/{self.phone_number}"
         resp = requests.get(url, params={"timeout": timeout}, timeout=timeout + 5)
         resp.raise_for_status()
         data = resp.json()
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list):
+            return []
+        envelopes = []
+        for entry in data:
+            envelope = entry.get("envelope", entry)
+            if envelope:
+                envelopes.append(envelope)
+        return envelopes
 
-    def reply(self, destination: Dict, message: str) -> None:
-        payload = {
+    def reply(self, envelope: Dict, message: str) -> None:
+        """Send a response to either a group chat or a 1:1 conversation."""
+        data_message = envelope.get("dataMessage", {})
+        group_info = data_message.get("groupInfo") or {}
+        source_number = (
+            envelope.get("sourceNumber")
+            or envelope.get("source", {}).get("number")
+        )
+        payload: Dict[str, object] = {
             "message": message,
             "number": self.phone_number,
         }
-        if "groupInfo" in destination and destination["groupInfo"]:
-            payload["recipients"] = []
-            payload["group_id"] = destination["groupInfo"]["groupId"]
+        if group_info.get("groupId"):
+            payload["groupId"] = group_info["groupId"]
+        elif source_number:
+            payload["recipients"] = [source_number]
         else:
-            payload["recipients"] = [destination["source"]["number"]]
+            raise ValueError("Unable to determine Signal destination.")
 
         url = f"{self.service_url}/v2/send"
         resp = requests.post(url, json=payload, timeout=15)

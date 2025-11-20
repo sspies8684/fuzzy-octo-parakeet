@@ -38,6 +38,7 @@ Alongside the FocusFlow UI, the repo now ships with a Python-based prediction-ma
 ### Quick Start (CLI Simulation)
 ```bash
 cd /workspace
+pip install -r requirements.txt
 python3 prediction_market_bot.py --mode cli
 # enter messages like:
 # alice: !open Will it snow? | Yes | No
@@ -54,8 +55,8 @@ State is saved (by default) to `data/prediction_state.json`. Delete the file if 
 - `!balance`, `!leaderboard [N]`, `!portfolio`, `!stats [user]` — account utilities
 
 ### Signal Integration (optional)
-1. Run [`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) and register your bot number.
-2. Install dependencies: `pip install requests`.
+1. Run [`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) (the community Signal SDK we integrate with) and register your bot number. See `docs/signal_integration.md` for a copy-paste walkthrough.
+2. Install dependencies: `pip install -r requirements.txt`.
 3. Export connection info:
    ```bash
    export SIGNAL_SERVICE_URL=http://localhost:8080
