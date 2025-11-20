@@ -21,3 +21,48 @@ FocusFlow is a minimalist browser-based task planner designed to help you captur
 3. In your repository settings, open the **Pages** tab and set **Build and deployment** → **Source** to **GitHub Actions**.
 4. Merge or push to `main`; the `Deploy to GitHub Pages` workflow uploads the static site (`index.html`, `styles.css`, `script.js`) and publishes it automatically.
 5. The workflow output lists the live URL. You can also find it in **Settings → Pages** once the deployment completes.
+
+---
+
+## Signal Prediction Market Bot
+
+Alongside the FocusFlow UI, the repo now ships with a Python-based prediction-market bot (`prediction_market_bot.py`) that you can run in a Signal group. Everyone starts with **1000 points**, can open new markets, place bets, and the bot shares live leaderboards.
+
+### Features
+- Parimutuel payout engine with unlimited custom outcomes
+- Persistent JSON storage so markets survive restarts
+- CLI simulation mode for local testing
+- Optional Signal connector for installations using `signal-cli-rest-api`
+- Leaderboards, user stats, and portfolio summaries
+
+### Quick Start (CLI Simulation)
+```bash
+cd /workspace
+python3 prediction_market_bot.py --mode cli
+# enter messages like:
+# alice: !open Will it snow? | Yes | No
+# bob: !bet MKT0001 1 200
+```
+
+State is saved (by default) to `data/prediction_state.json`. Delete the file if you want a clean slate.
+
+### Commands
+- `!open Question? | Option A | Option B` — create a new market (any user can do this)
+- `!markets [status]`, `!market <id>` — list markets or inspect one
+- `!bet <id> <option #> <points>` — wager your points
+- `!resolve <id> <option #>` / `!cancel <id>` — settle markets or refund everyone
+- `!balance`, `!leaderboard [N]`, `!portfolio`, `!stats [user]` — account utilities
+
+### Signal Integration (optional)
+1. Run [`signal-cli-rest-api`](https://github.com/bbernhard/signal-cli-rest-api) and register your bot number.
+2. Install dependencies: `pip install requests`.
+3. Export connection info:
+   ```bash
+   export SIGNAL_SERVICE_URL=http://localhost:8080
+   export SIGNAL_NUMBER=+15551234567
+   ```
+4. Start the bot:
+   ```bash
+   python3 prediction_market_bot.py --mode signal
+   ```
+5. Add the bot number to your Signal group; use the same `!` commands as in CLI mode.
