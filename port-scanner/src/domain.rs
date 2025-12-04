@@ -124,9 +124,9 @@ pub struct ScannerState {
 impl ScannerState {
     pub fn new(now: Instant, targets: Vec<PortTarget>) -> Self {
         let mut map = HashMap::new();
-        for t in targets {
-            let id = t.id.clone();
-            map.insert(id, TargetState::new(now, t));
+        for target in targets {
+            let id = target.id.clone();
+            map.insert(id, TargetState::new(now, target));
         }
         Self { targets: map }
     }

@@ -33,11 +33,11 @@ async fn main() -> Result<()> {
     let (state_gauge, unexpected_gauge) = init_metrics();
 
     let scanner_clone = scanner.clone();
-    let sg = state_gauge.clone();
-    let ug = unexpected_gauge.clone();
+    let state_gauge_clone = state_gauge.clone();
+    let unexpected_gauge_clone = unexpected_gauge.clone();
 
     tokio::spawn(async move {
-        run_scanner(scanner_clone, sg, ug).await;
+        run_scanner(scanner_clone, state_gauge_clone, unexpected_gauge_clone).await;
     });
 
     let app = {
