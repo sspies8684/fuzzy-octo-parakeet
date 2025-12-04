@@ -13,7 +13,6 @@ use std::time::Instant;
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::Mutex;
 use tokio::time::{sleep_until, Duration as TokioDuration, Instant as TokioInstant};
-use tracing::{error, info};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -93,7 +92,7 @@ async fn run_scanner(
                 let now = Instant::now();
                 let mut s = scanner.lock().await;
                 s.handle_probe_result(now, result);
-                update_metrics(&*s, &state_gauge, &unexpected_gauge);
+                update_metrics(&s, &state_gauge, &unexpected_gauge);
             }
             _ = sleep_fut => {}
         }
@@ -168,7 +167,7 @@ async fn metrics_handler(
 ) -> String {
     {
         let s = scanner.lock().await;
-        update_metrics(&*s, &state_gauge, &unexpected_gauge);
+        update_metrics(&s, &state_gauge, &unexpected_gauge);
     }
 
     let enc = TextEncoder::new();
