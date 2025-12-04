@@ -13,8 +13,10 @@ use std::time::Instant;
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::sync::Mutex;
 use tokio::time::{sleep_until, Duration as TokioDuration, Instant as TokioInstant};
+use tracing_subscriber::{fmt, EnvFilter};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::domain::ProbeOutcome::{Closed, Error, Open, Timeout};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -100,8 +102,6 @@ async fn run_scanner(
 }
 
 async fn run_probe(probe_request: ProbeRequest) -> ProbeResult {
-    use domain::ProbeOutcome::*;
-
     let outcome = match probe_request.protocol {
         PortProtocol::Tcp => {
             let timeout = TokioDuration::from_millis(probe_request.timeout.as_millis() as u64);
@@ -206,7 +206,6 @@ fn update_metrics(scanner: &ScannerState, state_gauge: &GaugeVec, unexpected_gau
 }
 
 fn init_tracing() {
-    use tracing_subscriber::{fmt, EnvFilter};
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::registry()
         .with(filter)
