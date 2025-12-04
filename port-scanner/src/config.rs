@@ -86,13 +86,9 @@ pub fn build_targets(cfg: &Config) -> Result<Vec<PortTarget>> {
                 Some(other) => return Err(anyhow!("Invalid expected state '{}'", other)),
             };
 
-            let interval = Duration::from_secs(
-                t.interval_secs.unwrap_or(host_interval)
-            );
+            let interval = Duration::from_secs(t.interval_secs.unwrap_or(host_interval));
 
-            let timeout = Duration::from_millis(
-                t.timeout_millis.unwrap_or(host_timeout)
-            );
+            let timeout = Duration::from_millis(t.timeout_millis.unwrap_or(host_timeout));
 
             let addr = SocketAddr::new(host_addr, t.port);
 

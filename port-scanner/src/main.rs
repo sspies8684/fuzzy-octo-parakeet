@@ -1,5 +1,5 @@
-mod domain;
 mod config;
+mod domain;
 
 use crate::config::{build_targets, load_config};
 use crate::domain::*;
@@ -100,13 +100,13 @@ async fn run_scanner(
     }
 }
 
-async fn run_probe(req: ProbeRequest) -> ProbeResult {
+async fn run_probe(probe_request: ProbeRequest) -> ProbeResult {
     use domain::ProbeOutcome::*;
 
-    let outcome = match req.protocol {
+    let outcome = match probe_request.protocol {
         PortProtocol::Tcp => {
-            let timeout = TokioDuration::from_millis(req.timeout.as_millis() as u64);
-            let fut = TcpStream::connect(req.addr);
+            let timeout = TokioDuration::from_millis(probe_request.timeout.as_millis() as u64);
+            let fut = TcpStream::connect(probe_request.addr);
             match tokio::time::timeout(timeout, fut).await {
                 Ok(Ok(_)) => Open,
                 Ok(Err(e)) => {
@@ -121,15 +121,15 @@ async fn run_probe(req: ProbeRequest) -> ProbeResult {
         }
 
         PortProtocol::Udp => {
-            let timeout = TokioDuration::from_millis(req.timeout.as_millis() as u64);
-            let fut = async {
+            let timeout = TokioDuration::from_millis(probe_request.timeout.as_millis() as u64);
+            let result = async {
                 let sock = UdpSocket::bind("0.0.0.0:0").await?;
-                sock.connect(req.addr).await?;
+                sock.connect(probe_request.addr).await?;
                 sock.send(&[0]).await?;
                 Ok::<(), std::io::Error>(())
             };
 
-            match tokio::time::timeout(timeout, fut).await {
+            match tokio::time::timeout(timeout, result).await {
                 Ok(Ok(())) => Open,
                 Ok(Err(_)) => Error,
                 Err(_) => Timeout,
@@ -137,7 +137,10 @@ async fn run_probe(req: ProbeRequest) -> ProbeResult {
         }
     };
 
-    ProbeResult { id: req.id, outcome }
+    ProbeResult {
+        id: probe_request.id,
+        outcome,
+    }
 }
 
 fn init_metrics() -> (GaugeVec, GaugeVec) {
@@ -146,14 +149,14 @@ fn init_metrics() -> (GaugeVec, GaugeVec) {
         "0=unknown,1=open,2=closed,3=timeout,4=error",
         &["target", "host", "port", "protocol", "expected"]
     )
-        .unwrap();
+    .unwrap();
 
     let unexpected_gauge = register_gauge_vec!(
         "port_unexpected",
         "unexpected state indicator",
         &["target", "host", "port", "protocol"]
     )
-        .unwrap();
+    .unwrap();
 
     (state_gauge, unexpected_gauge)
 }
@@ -175,30 +178,39 @@ async fn metrics_handler(
     String::from_utf8(buf).unwrap()
 }
 
-fn update_metrics(scanner: &ScannerState, sg: &GaugeVec, ug: &GaugeVec) {
-    for ts in scanner.iter_states() {
-        let t = ts.target();
-        let host = t.addr.ip().to_string();
-        let port = t.addr.port().to_string();
-        let proto = match t.protocol {
+fn update_metrics(scanner: &ScannerState, state_gauge: &GaugeVec, unexpected_gauge: &GaugeVec) {
+    for target_state in scanner.iter_states() {
+        let target = target_state.target();
+        let host = target.addr.ip().to_string();
+        let port = target.addr.port().to_string();
+        let proto = match target.protocol {
             PortProtocol::Tcp => "tcp",
             PortProtocol::Udp => "udp",
         };
-        let expected = match t.expected {
+        let expected = match target.expected {
             ExpectedState::Open => "open",
             ExpectedState::Closed => "closed",
         };
 
-        sg.with_label_values(&[&t.id, &host, &port, proto, expected])
-            .set(observed_state_to_f64(ts.last_observed()));
+        state_gauge
+            .with_label_values(&[&target.id, &host, &port, proto, expected])
+            .set(observed_state_to_f64(target_state.last_observed()));
 
-        ug.with_label_values(&[&t.id, &host, &port, proto])
-            .set(if ts.is_unexpected() { 1.0 } else { 0.0 });
+        unexpected_gauge
+            .with_label_values(&[&target.id, &host, &port, proto])
+            .set(if target_state.is_unexpected() {
+                1.0
+            } else {
+                0.0
+            });
     }
 }
 
 fn init_tracing() {
     use tracing_subscriber::{fmt, EnvFilter};
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry().with(filter).with(fmt::layer()).init();
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt::layer())
+        .init();
 }
