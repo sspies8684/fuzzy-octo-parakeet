@@ -78,11 +78,11 @@ async fn run_scanner(
             });
         }
 
-        let sleep_fut = if let Some(t) = next_timeout {
-            let d = t
+        let sleep_fut = if let Some(instant) = next_timeout {
+            let duration = instant
                 .checked_duration_since(now)
                 .unwrap_or_else(|| std::time::Duration::from_millis(10));
-            sleep_until(TokioInstant::now() + TokioDuration::from_millis(d.as_millis() as u64))
+            sleep_until(TokioInstant::now() + TokioDuration::from_millis(duration.as_millis() as u64))
         } else {
             sleep_until(TokioInstant::now() + TokioDuration::from_secs(1))
         };
